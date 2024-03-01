@@ -1,0 +1,125 @@
+﻿@implements IDisposable
+
+<div style="display: flex; flex-direction: row; justify-content: space-between; border: 5px solid white; border-radius: 15px; padding: 15px;">
+    <hgroup>
+        <h2>@TimeLeft</h2>
+        <p>You should be wrapping up at @FriendEndTime</p>
+        <h2>
+            @for (int i = 0; i < _dotCounter; i++)
+            {
+                <span>@@</span>
+            }
+        </h2>
+    </hgroup>
+    <div style="display: flex; flex-direction: row; justify-content: space-around; align-items: center; gap: 10px;"
+        <button @onclick="StartCountdown" disabled=@_isRunning>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill" viewBox="0 0 16 16">
+            <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+            </svg>
+        </button>
+        <button @onclick="PauseCountdown" disabled=@_notIsRunning>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause-fill" viewBox="0 0 16 16">
+                <path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5m5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5"/>
+            </svg>
+        </button>
+        <button @onclick="StopCountdown" disabled=@_notIsRunning>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-stop-fill" viewBox="0 0 16 16">
+                <path d="M5 3.5h6A1.5 1.5 0 0 1 12.5 5v6a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 11V5A1.5 1.5 0 0 1 5 3.5"/>
+            </svg>
+        </button>
+    </div>
+</div>
+
+@code
+{
+    private readonly PeriodicTimer _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+    private CancellationTokenSource _cts = new CancellationTokenSource();
+
+    private int _seconds = 0;
+    private const int _eightHoursInSeconds = 8 * 60 * 60;
+    private int _dotCounter = 0;
+
+    private string _startTime = string.Empty;
+
+    private bool _isRunning = false;
+    private bool _notIsRunning => !_isRunning;
+    private bool _hasStarted = false;
+
+    private DateTimeOffset _endTime;
+
+    private string TimeLeft
+    {
+        get
+        {
+            var timeLeft = _eightHoursInSeconds - _seconds;
+            var timeSpan = TimeSpan.FromSeconds(timeLeft);
+            
+            // return friendly time format of hours and minutes with no extra zeros
+            return timeSpan.ToString(@"h\:mm");
+        }
+    }
+
+    private string FriendEndTime
+    {
+        get
+        {
+            return _endTime.ToString("t");
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        while (await _timer.WaitForNextTickAsync(_cts.Token))
+        {
+            if (_isRunning)
+            {
+                _seconds++;
+
+                if ( _dotCounter+1 > 18)
+                {
+                    _dotCounter = 0;
+                }
+
+                _dotCounter++;
+
+            }
+
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void StartCountdown()
+    {
+        if (!_hasStarted)
+        {
+            ResetCountdown();
+            _hasStarted = true;
+        }
+
+        _isRunning = true;
+    }
+
+    private void PauseCountdown()
+    {
+        _isRunning = false;
+    }
+
+    private void StopCountdown()
+    {
+        _isRunning = false;
+        _hasStarted = false;
+    }
+
+    private void ResetCountdown()
+    {
+        _isRunning = false;
+        _hasStarted = false;
+        _seconds = 0;
+        _endTime = DateTimeOffset.Now.AddSeconds(_eightHoursInSeconds);
+    }
+
+    void IDisposable.Dispose()
+    {
+        _cts.Cancel();
+    }
+}

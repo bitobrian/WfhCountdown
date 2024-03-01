@@ -1,37 +1,71 @@
 ﻿@implements IDisposable
+@inject ILocalStorageService localStorage
 
-<div style="display: flex; flex-direction: row; justify-content: space-between; border: 5px solid white; border-radius: 15px; padding: 15px;">
-    <hgroup>
-        <h2>@TimeLeft</h2>
-        <p>You should be wrapping up at @FriendEndTime</p>
-        <h2>
-            @for (int i = 0; i < _dotCounter; i++)
-            {
-                <span>@@</span>
+<style>
+    .shimmering {
+        background: linear-gradient(-45deg, gold 40%, white 50%, gold 60%);
+        background-size: 300%;
+        background-position-x: 100%;
+        padding: 1px;
+        border-radius: 5px;
+        animation: shimmer 1s infinite linear;
+    }
+    .not-shimmering {
+        background: #13171f;
+        padding: 1px;
+        border-radius: 5px;
+    }
+    @@keyframes shimmer {
+        to {
+            background-position-x: 0%
+        }
+    }
+</style>
+
+<div class="@GetClass">
+    <div style="background-color: #13171f; display: flex; flex-direction: row; justify-content: space-between; padding: 15px; margin: 5px; border-radius: 5px;">
+        <hgroup>
+            @if(_hasStarted){
+                <h2>Name of timer</h2>
+                <h4>@TimeLeft</h4>
+                <p>ends at @FriendlyEndTime</p>
+            } else {
+                <h2>Set a name here</h2>
+                <h4>Your time remaining will be here</h4>
+                <p>Press play to start</p>
             }
-        </h2>
-    </hgroup>
-    <div style="display: flex; flex-direction: row; justify-content: space-around; align-items: center; gap: 10px;"
-        <button @onclick="StartCountdown" disabled=@_isRunning>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill" viewBox="0 0 16 16">
-            <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
-            </svg>
-        </button>
-        <button @onclick="PauseCountdown" disabled=@_notIsRunning>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause-fill" viewBox="0 0 16 16">
-                <path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5m5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5"/>
-            </svg>
-        </button>
-        <button @onclick="StopCountdown" disabled=@_notIsRunning>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-stop-fill" viewBox="0 0 16 16">
-                <path d="M5 3.5h6A1.5 1.5 0 0 1 12.5 5v6a1.5 1.5 0 0 1-1.5 1.5H5A1.5 1.5 0 0 1 3.5 11V5A1.5 1.5 0 0 1 5 3.5"/>
-            </svg>
-        </button>
+        </hgroup>
+        <div style="display: flex; flex-direction: row; justify-content: space-around; align-items: center; gap: 10px;">
+            @if(_isRunning)
+            {
+                <button @onclick="PauseCountdown" disabled=@_notIsRunning>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-pause-fill" viewBox="0 0 16 16">
+                        <path d="M5.5 3.5A1.5 1.5 0 0 1 7 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5m5 0A1.5 1.5 0 0 1 12 5v6a1.5 1.5 0 0 1-3 0V5a1.5 1.5 0 0 1 1.5-1.5"/>
+                    </svg>
+                </button>
+            } else {
+            <button @onclick="StartCountdown" disabled=@_isRunning>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-play-fill" viewBox="0 0 16 16">
+                    <path d="m11.596 8.697-6.363 3.692c-.54.313-1.233-.066-1.233-.697V4.308c0-.63.692-1.01 1.233-.696l6.363 3.692a.802.802 0 0 1 0 1.393"/>
+                    </svg>
+                </button>
+            }
+            @if(_hasStarted){
+            <button @onclick="ResetCountdown">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                </svg>
+            </button>
+            }
+        </div>
     </div>
 </div>
 
 @code
 {
+    const string STORAGE_KEY = "accumulatedTimeInSeconds";
+
     private readonly PeriodicTimer _timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
     private CancellationTokenSource _cts = new CancellationTokenSource();
 
@@ -54,12 +88,11 @@
             var timeLeft = _eightHoursInSeconds - _seconds;
             var timeSpan = TimeSpan.FromSeconds(timeLeft);
             
-            // return friendly time format of hours and minutes with no extra zeros
-            return timeSpan.ToString(@"h\:mm");
+            return timeSpan.ToString(@"h\:mm\:ss");
         }
     }
 
-    private string FriendEndTime
+    private string FriendlyEndTime
     {
         get
         {
@@ -67,13 +100,30 @@
         }
     }
 
+    private string GetClass
+    {
+        get
+        {
+            return _isRunning ? "shimmering" : "not-shimmering";
+        }
+    }
+
     protected override async Task OnInitializedAsync()
     {
+        _seconds = await localStorage.GetItemAsync<int>(STORAGE_KEY);
+
+        if (_seconds > 0)
+        {
+            _hasStarted = true;
+            _endTime = DateTimeOffset.Now.AddSeconds(_eightHoursInSeconds - _seconds);
+        }
+
         while (await _timer.WaitForNextTickAsync(_cts.Token))
         {
             if (_isRunning)
             {
                 _seconds++;
+                await SetTimeToLocalStorage();
 
                 if ( _dotCounter+1 > 18)
                 {
@@ -86,6 +136,11 @@
 
             await InvokeAsync(StateHasChanged);
         }
+    }
+
+    private async Task SetTimeToLocalStorage()
+    {
+        await localStorage.SetItemAsync(STORAGE_KEY, _seconds);
     }
 
     private void StartCountdown()
@@ -104,11 +159,6 @@
         _isRunning = false;
     }
 
-    private void StopCountdown()
-    {
-        _isRunning = false;
-        _hasStarted = false;
-    }
 
     private void ResetCountdown()
     {
